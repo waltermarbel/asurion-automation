@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: gem_admin
+      POSTGRES_PASSWORD: secure_password_123
+      POSTGRES_DB: gemini_gem
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - gem_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gem_admin -d gemini_gem"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gem_brain:
+    build: .
+    restart: always
+    working_dir: /app
+    env_file:
+      - .env
+    volumes:
+      - ./scripts:/app/scripts
+      - ./data:/app/data
+      - ./signatures:/app/signatures
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - gem_net
+    ports:
+      - "8000:8000"  # Health endpoint exposure
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+networks:
+  gem_net:
+    driver: bridge
